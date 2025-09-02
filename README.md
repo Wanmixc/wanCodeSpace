@@ -10,5 +10,5 @@ This repo just for testing codespace on github by me, learn react and generate c
 git clone https://github.com/Wanmixc/wanCodeSpace.git
 cd wanCodeSpace
 npm install
-npm run dev```
+npm run dev
 
