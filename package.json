@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:preview": "vite build && firebase hosting:channel:deploy demo --project wancodespace",
+    "deploy:live": "vite build && firebase deploy --only hosting --project wancodespace"
   },
   "dependencies": {
     "framer-motion": "^11.3.31",
