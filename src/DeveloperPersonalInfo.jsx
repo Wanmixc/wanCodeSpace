@@ -39,7 +39,7 @@ export default function DeveloperPersonalInfo() {
         "Membangun aplikasi yang cepat, aman, dan menyenangkan dipakai — dari database hingga UI.",
       location: "Batam, Indonesia",
       website: "https://example.dev",
-      email: "you@example.com",
+      email: "wanmixc@gmail.com",
       phone: "+62 812‑3456‑7890",
       socials: {
         github: "https://github.com/username",
