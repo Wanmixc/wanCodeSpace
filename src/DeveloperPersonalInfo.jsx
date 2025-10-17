@@ -55,7 +55,7 @@ export default function DeveloperPersonalInfo() {
         { label: "Android (Java)", level: 75 },
         { label: "UI/UX Design", level: 72 },
       ],
-      stacks: ["React", "Vite", "Tailwind", "Node", "CI3", "ASP.NET", "PostgreSQL", "SQL Server"],
+      stacks: ["React", "Next-JS", "Vite", "Tailwind", "Node", "CI3", "ASP.NET", "PostgreSQL", "SQL Server"],
       experiences: [
         {
           title: "Software Engineer",
