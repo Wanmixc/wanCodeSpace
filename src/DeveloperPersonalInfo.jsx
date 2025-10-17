@@ -47,7 +47,7 @@ export default function DeveloperPersonalInfo() {
       },
       skills: [
         { label: "JavaScript/TypeScript", level: 92 },
-        { label: "React + Tailwind", level: 90 },
+        { label: "CodeIgniter3", level: 100 },
         { label: "Node.js / Express", level: 88 },
         { label: "PHP (CodeIgniter)", level: 86 },
         { label: "C# / ASP.NET", level: 82 },
