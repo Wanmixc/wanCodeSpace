@@ -33,7 +33,7 @@ export default function DeveloperPersonalInfo() {
   // —— Data yang mudah diganti
   const profile = useMemo(
     () => ({
-      name: "Irawan",
+      name: "Irawan GG",
       role: "Full‑Stack Developer",
       tagline:
         "Membangun aplikasi yang cepat, aman, dan menyenangkan dipakai — dari database hingga UI.",
