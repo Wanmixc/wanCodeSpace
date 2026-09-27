@@ -2,7 +2,6 @@ FROM mcr.microsoft.com/devcontainers/base:noble
 
 USER root
 
-# Create ubuntu if it does not already exist.
 RUN if ! id ubuntu >/dev/null 2>&1; then \
         useradd --create-home --shell /bin/bash ubuntu; \
     fi \
