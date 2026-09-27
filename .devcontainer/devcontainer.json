@@ -1,5 +1,5 @@
 {
-  "name": "Ubuntu Server",
+  "name": "Ubuntu 24.04 Server",
   "build": {
     "dockerfile": "DevContainerUbuntu"
   },
