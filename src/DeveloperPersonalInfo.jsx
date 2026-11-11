@@ -37,7 +37,7 @@ export default function DeveloperPersonalInfo() {
       role: "Full‑Stack Developer",
       tagline:
         "Membangun aplikasi yang cepat, aman, dan menyenangkan dipakai — dari database hingga UI.",
-      location: "Batam, Indonesia",
+      location: "Papua, Indonesia",
       website: "https://example.dev",
       email: "wanmixc@gmail.com",
       phone: "+62 812‑3456‑7890",
