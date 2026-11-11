@@ -42,7 +42,7 @@ export default function DeveloperPersonalInfo() {
       email: "wanmixc@gmail.com",
       phone: "+62 812‑3456‑7890",
       socials: {
-        github: "https://github.com/username",
+        github: "https://github.com/wanmixc",
         linkedin: "https://linkedin.com/in/username",
       },
       skills: [
