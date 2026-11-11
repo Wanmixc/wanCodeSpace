@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   build-and-push:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -52,3 +53,15 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Deploy to Dokploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.API_KEY_WANCODESPACE }}
+          DOKPLOY_APPLICATION_ID: ${{ secrets.WANCODESPACE_ID }}
+        run: |
+          body=$(jq -n --arg id "$DOKPLOY_APPLICATION_ID" '{applicationId: $id}')
+          curl -fsS -X POST "$DOKPLOY_URL/api/application.deploy" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $DOKPLOY_API_KEY" \
+            -d "$body"
