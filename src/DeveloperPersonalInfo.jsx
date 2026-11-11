@@ -52,7 +52,7 @@ export default function DeveloperPersonalInfo() {
         { label: "PHP (CodeIgniter)", level: 86 },
         { label: "C# / ASP.NET", level: 82 },
         { label: "SQL Server / Postgres", level: 88 },
-        { label: "Android (Java)", level: 75 },
+        { label: "Rust", level: 75 },
         { label: "UI/UX Design", level: 72 },
       ],
       stacks: ["React", "Next-JS", "Vite", "Tailwind", "Node", "CI3", "ASP.NET", "PostgreSQL", "SQL Server"],
