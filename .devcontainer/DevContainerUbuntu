@@ -14,10 +14,10 @@ RUN if ! id ubuntu >/dev/null 2>&1; then \
     && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
 
-# Fish config for the ubuntu user: put tuios locations on PATH and check it.
+# Fish config for the ubuntu user: put tuios/opencode locations on PATH and check tuios.
 RUN install -d -o ubuntu -g ubuntu /home/ubuntu/.config/fish \
     && printf '%s\n' \
-        'fish_add_path -m $HOME/.local/bin /usr/local/bin' \
+        'fish_add_path -m $HOME/.opencode/bin $HOME/.local/bin /usr/local/bin' \
         'if not command -q tuios' \
         '    echo "tuios not found on PATH"' \
         'end' \
@@ -31,3 +31,31 @@ RUN curl -fsSL https://raw.githubusercontent.com/Gaurav-Gosain/tuios/main/instal
 # Install tuios-web (separate binary for the browser terminal).
 RUN curl -fsSL https://raw.githubusercontent.com/Gaurav-Gosain/tuios/main/install-web.sh | bash \
     && (command -v tuios-web || (echo "tuios-web not found on PATH after install" && exit 1))
+
+# Install gitui (terminal UI for git) from the upstream release. The release
+# binary is statically linked, so no extra runtime libraries are needed.
+RUN arch="$(dpkg --print-architecture)" \
+    && case "$arch" in \
+         amd64) gitui_arch=x86_64 ;; \
+         arm64) gitui_arch=aarch64 ;; \
+         *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+       esac \
+    && tmp="$(mktemp -d)" \
+    && curl -fsSL "https://github.com/extrawurst/gitui/releases/latest/download/gitui-linux-${gitui_arch}.tar.gz" \
+        -o "$tmp/gitui.tar.gz" \
+    && tar -xzf "$tmp/gitui.tar.gz" -C "$tmp" \
+    && install -m 0755 "$tmp/gitui" /usr/local/bin/gitui \
+    && rm -rf "$tmp" \
+    && gitui --version
+
+# Install OpenCode for the ubuntu user. --no-modify-path keeps PATH handling in
+# config.fish above instead of appending a duplicate fish_add_path line.
+USER ubuntu
+RUN export HOME=/home/ubuntu \
+    && curl -fsSL https://opencode.ai/v2/install | bash -s -- --no-modify-path \
+    && fish -lc 'if not command -q opencode; echo "opencode not found on fish PATH" >&2; exit 1; end; opencode --version' \
+    && fish -lc 'if not command -q gitui; echo "gitui not found on fish PATH" >&2; exit 1; end; gitui --version'
+USER root
+
+# Also expose OpenCode to non-fish shells (bash, sh, VS Code tasks).
+ENV PATH="/home/ubuntu/.opencode/bin:${PATH}"
