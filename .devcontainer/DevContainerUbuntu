@@ -24,6 +24,10 @@ RUN install -d -o ubuntu -g ubuntu /home/ubuntu/.config/fish \
         > /home/ubuntu/.config/fish/config.fish \
     && chown ubuntu:ubuntu /home/ubuntu/.config/fish/config.fish
 
-# Install TUIOS (runs under /bin/sh, so the login shell does not matter here).
+# Install TUIOS.
 RUN curl -fsSL https://raw.githubusercontent.com/Gaurav-Gosain/tuios/main/install.sh | bash \
     && (command -v tuios && tuios --version || (echo "tuios not found on PATH after install" && exit 1))
+
+# Install tuios-web (separate binary for the browser terminal).
+RUN curl -fsSL https://raw.githubusercontent.com/Gaurav-Gosain/tuios/main/install-web.sh | bash \
+    && (command -v tuios-web || (echo "tuios-web not found on PATH after install" && exit 1))
