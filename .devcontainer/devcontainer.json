@@ -1,5 +1,5 @@
 {
-  "name": "Ubuntu 24.04 Server",
+  "name": "AnduinOS Container (resolute)",
   "build": {
     "dockerfile": "DevContainerUbuntu"
   },
