@@ -1,10 +1,31 @@
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+# AnduinOS-based devcontainer image.
+# Base: aiursoft/anduinos (debootstrap-built, Ubuntu "resolute" userspace).
+# The base has no login user, sudo, git or ps, so those are added here.
+
+FROM aiursoft/anduinos:resolute
 
 USER root
 
-RUN if ! id ubuntu >/dev/null 2>&1; then \
-        useradd --create-home --shell /bin/bash ubuntu; \
-    fi \
-    && usermod --shell /bin/bash ubuntu \
-    && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
-    && chmod 0440 /etc/sudoers.d/ubuntu
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        procps \
+        sudo \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    if ! getent group ubuntu >/dev/null; then \
+        groupadd --system --gid 1000 ubuntu; \
+    fi; \
+    if ! id ubuntu >/dev/null 2>&1; then \
+        useradd --create-home --uid 1000 --gid ubuntu --shell /bin/bash ubuntu; \
+    fi; \
+    usermod --shell /bin/bash ubuntu; \
+    echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu; \
+    chmod 0440 /etc/sudoers.d/ubuntu; \
+    visudo -cf /etc/sudoers.d/ubuntu
