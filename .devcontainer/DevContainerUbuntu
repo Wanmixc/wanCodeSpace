@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
 USER root
@@ -56,6 +58,264 @@ RUN arch="$(dpkg --print-architecture)" \
     && install -m 0755 "$tmp/gitui" /usr/local/bin/gitui \
     && rm -rf "$tmp" \
     && gitui --version
+
+# ---------------------------------------------------------------------------
+# Neovim 0.13 (nightly) + a minimal, ready-to-use config
+# ---------------------------------------------------------------------------
+
+# Supporting tools:
+#   ripgrep / fd-find -> fuzzy finder (<leader>ff, <leader>fg)
+#   build-essential   -> compiler for tree-sitter parsers
+#   unzip / git       -> Mason and vim.pack
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        ripgrep \
+        fd-find \
+        unzip \
+    && ln -sf /usr/bin/fdfind /usr/local/bin/fd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Neovim 0.13 has no stable release yet, so install the official nightly build
+# for the image's architecture. tree-sitter-cli is pinned because
+# nvim-treesitter's `main` branch requires >= 0.26.1.
+RUN arch="$(dpkg --print-architecture)" \
+    && case "$arch" in \
+         amd64) nvim_arch=x86_64; ts_arch=x64 ;; \
+         arm64) nvim_arch=arm64;  ts_arch=arm64 ;; \
+         *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-${nvim_arch}.tar.gz" \
+        | tar -xz -C /opt \
+    && rm -rf /opt/nvim \
+    && mv "/opt/nvim-linux-${nvim_arch}" /opt/nvim \
+    && ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim \
+    && curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.2/tree-sitter-linux-${ts_arch}.gz" \
+        | gunzip > /usr/local/bin/tree-sitter \
+    && chmod 0755 /usr/local/bin/tree-sitter \
+    && nvim --version | head -n 1 \
+    && tree-sitter --version
+
+# Bake the Neovim config into the image, owned by the ubuntu user.
+RUN install -d -o ubuntu -g ubuntu /home/ubuntu/.config/nvim
+
+RUN cat > /home/ubuntu/.config/nvim/init.lua <<'LUA'
+-- ~/.config/nvim/init.lua
+-- Minimal Neovim 0.13 setup: LSP, fuzzy finding, treesitter, explorer, statusline.
+
+vim.g.mapleader = ' '
+vim.g.maplocalleader = ' '
+
+local opt = vim.opt
+
+-- Editor
+opt.number = true
+opt.relativenumber = true
+opt.signcolumn = 'yes'
+opt.cursorline = true
+opt.termguicolors = true
+opt.mouse = 'a'
+opt.scrolloff = 4
+opt.updatetime = 250
+opt.undofile = true
+opt.winborder = 'rounded'
+opt.laststatus = 3
+
+-- Indentation
+opt.expandtab = true
+opt.shiftwidth = 2
+opt.tabstop = 2
+opt.softtabstop = 2
+opt.smartindent = true
+
+-- Search & splits
+opt.ignorecase = true
+opt.smartcase = true
+opt.splitright = true
+opt.splitbelow = true
+
+-- Completion (used by the built-in LSP completion)
+opt.completeopt = { 'menu', 'menuone', 'noselect' }
+
+-- Inline diagnostics
+vim.diagnostic.config({
+  virtual_text = { spacing = 2, prefix = '●' },
+  severity_sort = true,
+  float = { border = 'rounded', source = true },
+})
+
+-- Plugins (built-in vim.pack, no plugin manager)
+vim.pack.add({
+  'https://github.com/neovim/nvim-lspconfig',
+  'https://github.com/mason-org/mason.nvim',
+  'https://github.com/mason-org/mason-lspconfig.nvim',
+  { src = 'https://github.com/nvim-treesitter/nvim-treesitter', version = 'main' },
+  'https://github.com/echasnovski/mini.nvim',
+})
+
+-- LSP -----------------------------------------------------------------------
+require('mason').setup()
+
+-- Sensible defaults for the Lua language server (this config is Lua).
+vim.lsp.config('lua_ls', {
+  settings = {
+    Lua = {
+      runtime = { version = 'LuaJIT' },
+      workspace = { checkThirdParty = false, library = { vim.env.VIMRUNTIME } },
+      diagnostics = { globals = { 'vim' } },
+      telemetry = { enable = false },
+    },
+  },
+})
+
+-- Installs lua_ls on first run and enables every server installed via :Mason.
+require('mason-lspconfig').setup({
+  ensure_installed = { 'lua_ls' },
+  automatic_enable = true,
+})
+
+vim.api.nvim_create_autocmd('LspAttach', {
+  group = vim.api.nvim_create_augroup('user-lsp', { clear = true }),
+  callback = function(ev)
+    local function map(keys, fn, desc)
+      vim.keymap.set('n', keys, fn, { buffer = ev.buf, desc = 'LSP: ' .. desc })
+    end
+
+    map('gd', vim.lsp.buf.definition, 'Go to definition')
+    map('gD', vim.lsp.buf.declaration, 'Go to declaration')
+    map('gr', vim.lsp.buf.references, 'References')
+    map('gi', vim.lsp.buf.implementation, 'Implementation')
+    map('K', vim.lsp.buf.hover, 'Hover')
+    map('<leader>rn', vim.lsp.buf.rename, 'Rename')
+    map('<leader>ca', vim.lsp.buf.code_action, 'Code action')
+    map('<leader>f', function() vim.lsp.buf.format({ async = true }) end, 'Format')
+    map(']d', function() vim.diagnostic.jump({ count = 1 }) end, 'Next diagnostic')
+    map('[d', function() vim.diagnostic.jump({ count = -1 }) end, 'Previous diagnostic')
+
+    -- Built-in completion (no nvim-cmp needed in 0.13).
+    vim.lsp.completion.enable(true, ev.data.client_id, ev.buf, { autotrigger = true })
+  end,
+})
+
+-- Treesitter ----------------------------------------------------------------
+local parsers = {
+  'lua', 'vim', 'vimdoc', 'query', 'markdown', 'markdown_inline', 'diff',
+  'python', 'bash', 'json', 'yaml', 'toml', 'c',
+  'javascript', 'typescript', 'tsx', 'html', 'css', 'go', 'rust',
+}
+
+local ts = require('nvim-treesitter')
+ts.setup()
+ts.install(parsers)
+
+vim.api.nvim_create_autocmd('FileType', {
+  group = vim.api.nvim_create_augroup('user-treesitter', { clear = true }),
+  callback = function(ev)
+    -- No-op for filetypes without an installed parser; regex syntax still applies.
+    pcall(vim.treesitter.start, ev.buf)
+  end,
+})
+
+-- Fuzzy find, explorer, statusline (mini.nvim) ------------------------------
+require('mini.pick').setup()
+require('mini.files').setup()
+require('mini.statusline').setup()
+
+local map = vim.keymap.set
+
+-- File explorer (Miller columns). <leader>e toggles it.
+map('n', '<leader>e', function()
+  if not require('mini.files').close() then require('mini.files').open() end
+end, { desc = 'Toggle file explorer' })
+
+-- `:Explore [dir]` still works, backed by mini.files.
+vim.api.nvim_create_user_command('Explore', function(args)
+  require('mini.files').open(args.args ~= '' and args.args or vim.fn.getcwd())
+end, { nargs = '?', complete = 'dir', desc = 'Open file explorer' })
+
+-- Fuzzy finding
+map('n', '<leader>ff', function() require('mini.pick').builtin.files() end, { desc = 'Find files' })
+map('n', '<leader>fg', function() require('mini.pick').builtin.grep_live() end, { desc = 'Live grep' })
+map('n', '<leader>fb', function() require('mini.pick').builtin.buffers() end, { desc = 'Buffers' })
+map('n', '<leader>fh', function() require('mini.pick').builtin.help() end, { desc = 'Help' })
+map('n', '<leader>fr', function() require('mini.pick').builtin.resume() end, { desc = 'Resume picker' })
+
+map('n', '<Esc>', '<cmd>nohlsearch<cr>', { desc = 'Clear search highlight' })
+LUA
+
+RUN cat > /home/ubuntu/.config/nvim/README.md <<'MD'
+# Minimal Neovim 0.13 config
+
+Single-file config: `init.lua`. Plugins are managed by the built-in `vim.pack`
+(`:packupdate`, `:packdel`).
+
+## Plugins
+
+| Purpose | Plugin |
+| --- | --- |
+| LSP | `nvim-lspconfig`, `mason.nvim`, `mason-lspconfig.nvim` |
+| Fuzzy find / explorer / statusline | `mini.nvim` (`mini.pick`, `mini.files`, `mini.statusline`) |
+| Syntax highlighting | `nvim-treesitter` (`main` branch) |
+
+## Keys
+
+| Keys | Action |
+| --- | --- |
+| `<leader>e` / `:Explore [dir]` | Toggle file explorer |
+| `<leader>ff` | Find files |
+| `<leader>fg` | Live grep |
+| `<leader>fb` | Buffers |
+| `<leader>fh` | Help |
+| `<leader>fr` | Resume last picker |
+| `gd` / `gD` | Definition / declaration |
+| `gr` / `gi` | References / implementation |
+| `K` | Hover |
+| `<leader>rn` | Rename symbol |
+| `<leader>ca` | Code action |
+| `<leader>f` | Format buffer |
+| `[d` / `]d` | Previous / next diagnostic |
+
+Completion is Neovim's built-in LSP completion (auto-triggered on attach).
+
+## LSP servers
+
+`lua_ls` is installed automatically. Add more with Mason:
+
+```vim
+:MasonInstall pyright ts_ls gopls rust-analyzer
+```
+
+`mason-lspconfig` enables every installed server automatically. Configure a
+server with `vim.lsp.config('<name>', { ... })` in `init.lua`.
+
+## Treesitter
+
+Parsers are installed for: lua, vim, vimdoc, query, markdown, markdown_inline,
+diff, python, bash, json, yaml, toml, c, javascript, typescript, tsx, html,
+css, go, rust. Edit the `parsers` list in `init.lua` to change this, then
+`:restart`.
+MD
+
+RUN chown -R ubuntu:ubuntu /home/ubuntu/.config/nvim
+
+# Pre-install plugins, treesitter parsers and the Lua language server, so the
+# first `nvim` in the container starts fully set up and needs no network.
+USER ubuntu
+RUN export HOME=/home/ubuntu \
+    && nvim --headless \
+        "+lua require('nvim-treesitter').install({ 'lua', 'vim', 'vimdoc', 'query', 'markdown', 'markdown_inline', 'diff', 'python', 'bash', 'json', 'yaml', 'toml', 'c', 'javascript', 'typescript', 'tsx', 'html', 'css', 'go', 'rust' }):wait(900000)" \
+        "+lua local r = require('mason-registry'); vim.wait(300000, function() return r.has_package('lua-language-server') end, 1000); local p = r.get_package('lua-language-server'); if not p:is_installed() then pcall(p.install, p) end; vim.wait(600000, function() return p:is_installed() end, 1000); vim.wait(15000)" \
+        "+qa"
+USER root
+
+# Fail the build if the pre-installed pieces are missing.
+RUN test -x /home/ubuntu/.local/share/nvim/mason/bin/lua-language-server \
+    && test -f /home/ubuntu/.local/share/nvim/site/parser/lua.so \
+    && test -d /home/ubuntu/.local/share/nvim/site/pack/core/opt/mini.nvim \
+    && echo "Neovim 0.13 config, treesitter parsers and lua_ls are preinstalled"
 
 # Install OpenCode for the ubuntu user. --no-modify-path keeps PATH handling in
 # config.fish above instead of appending a duplicate fish_add_path line.
