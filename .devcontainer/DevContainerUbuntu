@@ -2,9 +2,28 @@ FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
 
 USER root
 
+# Install fish shell from the Ubuntu repository.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fish \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN if ! id ubuntu >/dev/null 2>&1; then \
-        useradd --create-home --shell /bin/bash ubuntu; \
+        useradd --create-home --shell /usr/bin/fish ubuntu; \
     fi \
-    && usermod --shell /bin/bash ubuntu \
+    && usermod --shell /usr/bin/fish ubuntu \
     && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
+
+# Fish config for the ubuntu user: put tuios locations on PATH and check it.
+RUN install -d -o ubuntu -g ubuntu /home/ubuntu/.config/fish \
+    && printf '%s\n' \
+        'fish_add_path -m $HOME/.local/bin /usr/local/bin' \
+        'if not command -q tuios' \
+        '    echo "tuios not found on PATH"' \
+        'end' \
+        > /home/ubuntu/.config/fish/config.fish \
+    && chown ubuntu:ubuntu /home/ubuntu/.config/fish/config.fish
+
+# Install TUIOS (runs under /bin/sh, so the login shell does not matter here).
+RUN curl -fsSL https://raw.githubusercontent.com/Gaurav-Gosain/tuios/main/install.sh | bash \
+    && (command -v tuios && tuios --version || (echo "tuios not found on PATH after install" && exit 1))
