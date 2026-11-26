@@ -14,9 +14,18 @@ RUN if ! id ubuntu >/dev/null 2>&1; then \
     && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu
 
+# Create the ubuntu user's config and local directories, all owned by ubuntu.
+# install -d -o applies the owner to every directory listed, unlike creating
+# parents implicitly, which would leave /home/ubuntu/.config owned by root.
+RUN install -d -o ubuntu -g ubuntu \
+        /home/ubuntu/.config \
+        /home/ubuntu/.config/fish \
+        /home/ubuntu/.config/opencode \
+        /home/ubuntu/.local \
+        /home/ubuntu/.local/bin
+
 # Fish config for the ubuntu user: put tuios/opencode locations on PATH and check tuios.
-RUN install -d -o ubuntu -g ubuntu /home/ubuntu/.config/fish \
-    && printf '%s\n' \
+RUN printf '%s\n' \
         'fish_add_path -m $HOME/.opencode/bin $HOME/.local/bin /usr/local/bin' \
         'if not command -q tuios' \
         '    echo "tuios not found on PATH"' \
